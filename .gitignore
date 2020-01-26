@@ -3,6 +3,8 @@
 
 CMakeLists.txt
 
+.vscode/
+
 # Created by https://www.gitignore.io/api/c,linux,clion+all
 # Edit at https://www.gitignore.io/?templates=c,linux,clion+all
 
