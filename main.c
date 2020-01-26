@@ -8,7 +8,7 @@ int main()
     while (1)
     {
         char *cmd = readline("#");
-        // printf(cmd);
+        printf("%s\n", cmd);
     }
 
     return 0;
