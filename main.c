@@ -14,14 +14,31 @@ int main()
         // Read the command into the cmd string
         char *cmd = readline("# ");
 
-        // TODO: Tokenize the command
+        // Tokenize the command
+        char *cmdArgs[70];
+        int cmdArgc = 0;
+        char *token;
+
+        /* get the first token */
+        token = strtok(cmd, " ");
+
+        /* walk through other tokens */
+        while (token != NULL)
+        {
+            cmdArgs[cmdArgc++] = token;
+
+            token = strtok(NULL, " ");
+        }
+        
+        // Add a NULL to the end of the argv array
+        cmdArgs[cmdArgc] = NULL;
 
         // Fork
         cpid = fork();
         if (cpid == 0)
         {
             // child code
-            execlp(cmd, cmd, (char *)NULL);
+            execvp(cmdArgs[0], cmdArgs);
         }
     }
 
