@@ -15,7 +15,7 @@ int main()
         char *cmd = readline("# ");
 
         // Tokenize the command
-        char *cmdArgs[70];
+        char *cmdArgv[70];
         int cmdArgc = 0;
         char *token;
 
@@ -25,20 +25,20 @@ int main()
         /* walk through other tokens */
         while (token != NULL)
         {
-            cmdArgs[cmdArgc++] = token;
+            cmdArgv[cmdArgc++] = token;
 
             token = strtok(NULL, " ");
         }
-        
+
         // Add a NULL to the end of the argv array
-        cmdArgs[cmdArgc] = NULL;
+        cmdArgv[cmdArgc] = NULL;
 
         // Fork
         cpid = fork();
         if (cpid == 0)
         {
             // child code
-            execvp(cmdArgs[0], cmdArgs);
+            execvp(cmdArgv[0], cmdArgv);
         }
     }
 
