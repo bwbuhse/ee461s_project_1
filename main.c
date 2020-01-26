@@ -3,14 +3,12 @@
 #include <sys/types.h>
 #include <string.h>
 
-int main()
-{
+int main() {
     int cpid;
     // char cmd[80];
 
     // Main command loop
-    while (1)
-    {
+    while (1) {
         // Read the command into the cmd string
         char *cmd = readline("# ");
 
@@ -23,8 +21,7 @@ int main()
         token = strtok(cmd, " ");
 
         /* walk through other tokens */
-        while (token != NULL)
-        {
+        while (token != NULL) {
             cmdArgv[cmdArgc++] = token;
 
             token = strtok(NULL, " ");
@@ -35,8 +32,7 @@ int main()
 
         // Fork
         cpid = fork();
-        if (cpid == 0)
-        {
+        if (cpid == 0) {
             // child code
             execvp(cmdArgv[0], cmdArgv);
         }
