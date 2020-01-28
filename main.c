@@ -1,10 +1,12 @@
 #include <readline/readline.h>
-#include <unistd.h>
-#include <sys/types.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 int main() {
-  int cpid;
+  pid_t cpid;
+  int status;
   // char cmd[80]
 
   // Main command loop
@@ -36,6 +38,10 @@ int main() {
       // child code
       execvp(cmdArgv[0], cmdArgv);
     }
+
+    // Wait for the child processes to finish
+    // TODO: Update this whenever I add background processes
+    waitpid(-1, &status, 0);
   }
 
   return 0;
