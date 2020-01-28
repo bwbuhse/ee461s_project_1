@@ -23,17 +23,11 @@ int main() {
     int cmdArgc = 0;
     char *token;
 
-    /* get the first token */
     token = strtok(cmd, " ");
-
-    /* walk through other tokens */
     while (token != NULL) {
       cmdArgv[cmdArgc++] = token;
-
       token = strtok(NULL, " ");
     }
-
-    // Add a NULL to the end of the argv array
     cmdArgv[cmdArgc] = NULL;
 
     // Fork
