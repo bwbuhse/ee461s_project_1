@@ -4,6 +4,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+// TODO: Add process groups     [ ]
+// TODO: Add file redirects     [ ]
+// TODO: Add pipes              [ ]
+
 int main() {
   pid_t cpid;
   int status;
