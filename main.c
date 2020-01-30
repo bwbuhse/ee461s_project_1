@@ -4,16 +4,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-// TODO: Add file redirects     [ ]
 // TODO: Add process groups     [ ]
+// TODO: Add file redirects     [ ]
 // TODO: Add pipes              [ ]
-
-// Used for tokenizing user input
-// Params:
-//      cmd - a pointe rthe FULL command input from the user
-//      cmdArgv - a pointer to the argv for the current command
-//      startIndex - the index to start parsing cmd at
-void tokenizeToNextCmd(char **cmd, char ***cmdArgv, int *startIndex);
 
 int main() {
   pid_t cpid;
@@ -25,23 +18,24 @@ int main() {
     // Read the command into the cmd string
     char *cmd = readline("# ");
 
-    // TODO: Maybe move Tokenization into a separate function that stops once a
-    // redirect/pipe is found? Tokenize the command
-    char *cmdArgv[70][70]; // I used 70 because 2000/30~=70 :)
-    int previousFileIndex = 0, cmdIndex = 0, argIndex;
+    // Tokenize the command
+    char *cmdArgv[70]; // I used 70 because 3000/20~=70 :)
+    int cmdArgc = 0;
+    char *token;
 
-    while (argIndex != -1) {
+    token = strtok(cmd, " ");
+    while (token != NULL) {
+      cmdArgv[cmdArgc++] = token;
+      token = strtok(NULL, " ");
     }
+    cmdArgv[cmdArgc] = NULL;
 
-    // while (
-
-    /* TODO: Fix this for new command
     // Fork
     cpid = fork();
     if (cpid == 0) {
       // child code
       execvp(cmdArgv[0], cmdArgv);
-    } */
+    }
 
     // Wait for the child processes to finish
     // TODO: Update this whenever I add background processes
@@ -50,23 +44,3 @@ int main() {
 
   return 0;
 }
-
-void tokenizeToNextCmd(char **cmd, char ***cmdArgv, int *startIndex) {
-  int cmdArgc = 0;
-  char *token = strtok(cmd, " ");
-
-  while (token != NULL) {
-    if (strcmp("<", token) == 0 || strcmp(">", token) == 0 ||
-        strcmp("2>", token) == 0 || strcmp("|", token) == 0) {
-      // Returns if
-      return;
-    }
-
-    *cmdArgv[cmdArgc++] = token;
-    token = strtok(NULL, " ");
-  }
-
-  cmdArgv[cmdArgc] = NULL;
-  *startIndex = -1;
-}
-
