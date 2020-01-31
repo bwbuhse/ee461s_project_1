@@ -11,7 +11,7 @@
 
 // Used to tokenize the user's input
 // Returns the total number of tokens
-int tokenize(char **input, char **tokenizedInputPtr[]);
+int tokenize(char **input, char **tokenized_input_ptr[]);
 
 int main() {
   pid_t cpid;
@@ -21,14 +21,14 @@ int main() {
   while (1) {
     // Read the input into the string and then tokenize it
     char *input = readline("# ");
-    char **tokenizedInput;
-    int numTokens = tokenize(&input, &tokenizedInput);
+    char **tokenized_input;
+    int num_tokens = tokenize(&input, &tokenized_input);
 
     // Fork
     cpid = fork();
     if (cpid == 0) {
       // child code
-      execvp(tokenizedInput[0], tokenizedInput);
+      execvp(tokenized_input[0], tokenized_input);
     }
 
     // Wait for the child processes to finish
@@ -39,23 +39,23 @@ int main() {
   return 0;
 }
 
-int tokenize(char **input, char **tokenizedInputPtr[]) {
+int tokenize(char **input, char **tokenized_input_ptr[]) {
   // I used 70 because 3000/20~=70 :)
-  char *tokenizedInput[70];
+  char *tokenized_input[70];
 
   // Create my variables
-  int numTokens = 0;
+  int num_tokens = 0;
   char *token;
 
   token = strtok(*input, " ");
   while (token != NULL) {
-    tokenizedInput[numTokens++] = token;
+    tokenized_input[num_tokens++] = token;
     token = strtok(NULL, " ");
   }
-  tokenizedInput[numTokens] = NULL;
+  tokenized_input[num_tokens] = NULL;
 
-  *tokenizedInputPtr = tokenizedInput;
+  *tokenized_input_ptr = tokenized_input;
 
-  return numTokens;
+  return num_tokens;
 }
 
