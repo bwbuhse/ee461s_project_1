@@ -1,8 +1,8 @@
 yash: main.o
-	gcc main.o -lreadline -o yash
+	gcc -std=c11 main.o -lreadline -o yash
 
 main.o: main.c
-	gcc -c main.c
+	gcc -std=c11 -c main.c
 
 clean:
 	rm *.o yash
