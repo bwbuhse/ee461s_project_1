@@ -7,34 +7,28 @@
 // TODO: Add process groups     [ ]
 // TODO: Add file redirects     [ ]
 // TODO: Add pipes              [ ]
+// TODO: Add signal handling    [ ]
+
+// Used to tokenize the user's input
+// Returns the total number of tokens
+int tokenize(char **input, char **tokenizedInputPtr[]);
 
 int main() {
   pid_t cpid;
   int status;
-  // char cmd[80]
 
   // Main command loop
   while (1) {
-    // Read the command into the cmd string
-    char *cmd = readline("# ");
-
-    // Tokenize the command
-    char *cmdArgv[70]; // I used 70 because 3000/20~=70 :)
-    int cmdArgc = 0;
-    char *token;
-
-    token = strtok(cmd, " ");
-    while (token != NULL) {
-      cmdArgv[cmdArgc++] = token;
-      token = strtok(NULL, " ");
-    }
-    cmdArgv[cmdArgc] = NULL;
+    // Read the input into the string and then tokenize it
+    char *input = readline("# ");
+    char **tokenizedInput;
+    int numTokens = tokenize(&input, &tokenizedInput);
 
     // Fork
     cpid = fork();
     if (cpid == 0) {
       // child code
-      execvp(cmdArgv[0], cmdArgv);
+      execvp(tokenizedInput[0], tokenizedInput);
     }
 
     // Wait for the child processes to finish
@@ -44,3 +38,24 @@ int main() {
 
   return 0;
 }
+
+int tokenize(char **input, char **tokenizedInputPtr[]) {
+  // I used 70 because 3000/20~=70 :)
+  char *tokenizedInput[70];
+
+  // Create my variables
+  int numTokens = 0;
+  char *token;
+
+  token = strtok(*input, " ");
+  while (token != NULL) {
+    tokenizedInput[numTokens++] = token;
+    token = strtok(NULL, " ");
+  }
+  tokenizedInput[numTokens] = NULL;
+
+  *tokenizedInputPtr = tokenizedInput;
+
+  return numTokens;
+}
+
