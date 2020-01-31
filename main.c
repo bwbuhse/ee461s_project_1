@@ -75,6 +75,16 @@ int main() {
           found_error = true;
           break;
         }
+      } else if (!strcmp(tokenized_input[i], ERR_REDIR)) {
+        redirect_found = true;
+
+        if (i + 1 < num_tokens) {
+          cmd1.error_file = tokenized_input[i + 1];
+        } else {
+          // The input was invalid if i >= num_tokens here (ended cmd w >)
+          found_error = true;
+          break;
+        }
       }
 
       // If a redirect hasn't been found yet, we know we're still adding args
@@ -101,10 +111,17 @@ int main() {
       if (cmd1.input_file) {
         int ifd = open(cmd1.input_file, O_RDONLY);
 
+        // If the file doesn't exist then just skip this command and go to the
+        // top
         if (ifd == -1) {
           continue;
         }
         dup2(ifd, STDIN_FILENO);
+      }
+      if (cmd1.error_file) {
+        int ofd = open(cmd1.error_file, O_CREAT | O_WRONLY | O_TRUNC,
+                       S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
+        dup2(ofd, STDERR_FILENO);
       }
 
       execvp(tokenized_input[0], tokenized_input);
