@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <readline/readline.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -11,6 +12,8 @@
 // TODO: Add file redirects     [ ]
 // TODO: Add pipes              [ ]
 // TODO: Add signal handling    [ ]
+// TODO: Figure out where my
+//      memory leaks are        [ ]
 
 // Some macros used for keeping code nice
 #define PROMPT "# "
@@ -41,10 +44,16 @@ int main() {
   while (true) {
     // Flag used for if erros are found
     bool found_error = false;
-
     // Read the input into the string and then tokenize it
     char *input = readline(PROMPT);
     char **tokenized_input;
+
+    // Exit the shell if it's passed the EOF character
+    if (input == NULL) {
+      printf("\n");
+      break;
+    }
+
     int num_tokens = tokenize(&input, &tokenized_input);
 
     // Check for any redirections in the command
@@ -127,6 +136,7 @@ int main() {
       execvp(tokenized_input[0], tokenized_input);
     } else {
       // Parent code
+      free(tokenized_input);
     }
 
     // Wait for the child processes to finish
@@ -139,7 +149,8 @@ int main() {
 
 int tokenize(char **input, char **tokenized_input_ptr[]) {
   // I used 70 because 3000/20~=70 :)
-  char *tokenized_input[70];
+  // TODO: Free this!
+  char **tokenized_input = (char **)malloc(sizeof(char *) * 70);
 
   // Create my variables
   int num_tokens = 0;
