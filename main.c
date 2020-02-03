@@ -42,7 +42,7 @@ int main() {
 
   // Main command loop
   while (true) {
-    // Flag used for if erros are found
+    // Flag used for if errors are found
     bool found_error = false;
     // Read the input into the string and then tokenize it
     char *input = readline(PROMPT);
@@ -134,9 +134,12 @@ int main() {
       }
 
       execvp(tokenized_input[0], tokenized_input);
+      free(input);
+      break;
     } else {
       // Parent code
       free(tokenized_input);
+      free(input);
     }
 
     // Wait for the child processes to finish
