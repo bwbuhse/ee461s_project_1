@@ -22,15 +22,27 @@
 #define PIPE "|"
 
 // A struct used for holding parsed versions of commands
-typedef struct tokenized_cmd_t {
+typedef struct process {
   char **argv; // Args for execvp
   char *output_file;
   char *input_file;
   char *error_file;
-  bool pipeArg1; // set to true when the command is on the left side of a pipe
-  bool pipeArg2; // set to true when the command is on the right side of a pipe
+  bool isPipeArg1; // true when the command is on the left side of a pipe
+  bool isPipeArg2; // true when the command is on the right side of a pipe
 
-} tokenized_cmd_t;
+} process;
+
+// A struct used for the setup_tok_cmd function
+typedef struct setup_bools {
+  bool *found_error;
+  bool *redirect_found;
+} setup_bools;
+
+// A struct used for the setup_tok_cmd function
+typedef struct setup_nums {
+  int *num_tokens;
+  int *start_index;
+} setup_nums;
 
 // Used to tokenize the user's input
 // Returns the total number of tokens
@@ -39,8 +51,8 @@ int tokenize(char **input, char **tokenized_input_ptr[]);
 // Used to set up a tokenized_cmd
 // nums {&num_tokens, &start_index}
 // bools {&error_found, &redirect_found}
-bool setup_tok_cmd(char **tokenized_input_ptr[], tokenized_cmd_t *cmd,
-                   int *nums[], bool *bools[]);
+bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
+                   setup_bools *bools);
 
 int main() {
   pid_t cpid;
@@ -60,8 +72,8 @@ int main() {
 
     // Check for any redirections in the command
     // cmd2 is only used if there's a pipe
-    tokenized_cmd_t cmd1 = {tokenized_input, NULL, NULL, NULL, false, false};
-    tokenized_cmd_t cmd2 = {NULL, NULL, NULL, NULL, false, false};
+    process cmd1 = {tokenized_input, NULL, NULL, NULL, false, false};
+    process cmd2 = {NULL, NULL, NULL, NULL, false, false};
 
     // Nums used for looking for redirects
     int num_tokens = tokenize(&input, &tokenized_input);
@@ -71,10 +83,10 @@ int main() {
     bool redirect_found = false;
     bool found_error = false;
 
-    int *nums[] = {&num_tokens, &start_index};
-    bool *bools[] = {&found_error, &redirect_found};
+    setup_nums nums = {&num_tokens, &start_index};
+    setup_bools bools = {&found_error, &redirect_found};
 
-    bool pipe_found = setup_tok_cmd(&tokenized_input, &cmd1, nums, bools);
+    bool pipe_found = setup_tok_cmd(&tokenized_input, &cmd1, &nums, &bools);
 
     // If I found an error then there's no point in trying
     // the command
@@ -144,66 +156,64 @@ int tokenize(char **input, char **tokenized_input_ptr[]) {
   return num_tokens;
 }
 
-// bool setup_tok_cmd(tokenized_cmd_t *cmd, char **tokenized_input_ptr[],
-//                  int start_index, int num_tokens, bool *found_error) {
-bool setup_tok_cmd(char **tokenized_input_ptr[], tokenized_cmd_t *cmd,
-                   int *nums[], bool *bools[]) {
+bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
+                   setup_bools *bools) {
 
   bool pipe_found = false;
   int i;
 
-  for (i = (*nums)[1]; i < (*nums)[0]; i++) {
+  for (i = *(nums->start_index); i < *(nums->num_tokens); i++) {
     // Check for pipe
     if (!strcmp((*tokenized_input_ptr)[i], PIPE)) {
-      if (i + 1 < (*nums)[0]) {
+      if (i + 1 < *(nums->num_tokens)) {
         pipe_found = true;
       } else {
-        *bools[0] = true;
+        *(bools->found_error) = true;
         break;
       }
     }
 
     // Check for various file redirections
     if (!strcmp((*tokenized_input_ptr)[i], OUTPUT_REDIR)) {
-      *bools[1] = true;
+      *(bools->redirect_found) = true;
 
-      if (i + 1 < (*nums)[0]) {
+      if (i + 1 < *(nums->num_tokens)) {
         (*cmd).output_file = (*tokenized_input_ptr)[i + 1];
       } else {
         // The input was invalid if i >= num_tokens here (ended cmd w >)
-        *bools[0] = true;
+        *(bools->found_error) = true;
         break;
       }
     } else if (!strcmp((*tokenized_input_ptr)[i], INPUT_REDIR)) {
-      *bools[1] = true;
+      *(bools->redirect_found) = true;
 
-      if (i + 1 < (*nums)[0]) {
+      if (i + 1 < *(nums->num_tokens)) {
         (*cmd).input_file = (*tokenized_input_ptr)[i + 1];
       } else {
         // The input was invalid if i >= num_tokens here (ended cmd w >)
-        *bools[0] = true;
+        *(bools->found_error) = true;
         break;
       }
     } else if (!strcmp((*tokenized_input_ptr)[i], ERR_REDIR)) {
-      *bools[1] = true;
+      *(bools->redirect_found) = true;
 
-      if (i + 1 < (*nums)[0]) {
+      if (i + 1 < *(nums->num_tokens)) {
         (*cmd).error_file = (*tokenized_input_ptr)[i + 1];
       } else {
         // The input was invalid if i >= num_tokens here (ended cmd w >)
-        *bools[0] = true;
+        *(bools->found_error) = true;
         break;
       }
     }
 
     // If a redirect hasn't been found yet, we know we're still adding args
-    if (*bools[1]) {
+    if (*(bools->redirect_found)) {
       (*tokenized_input_ptr)[i] = NULL;
     }
   }
 
   // Used to return the value, needed for when a pipe is found
-  (*nums)[0] = i;
+  *(nums->start_index) = i;
 
   return pipe_found;
 }
