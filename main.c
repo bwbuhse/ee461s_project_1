@@ -12,7 +12,7 @@
 // TODO: Add file redirects     [x]
 // TODO: Add pipes              [ ]
 // TODO: Add signal handling    [ ]
-// TODO: Create bools_t & nums_t[ ]
+// TODO: Create bools_t & nums_t[x]
 
 // Some macros used for keeping code nice
 #define PROMPT "# "
@@ -70,14 +70,14 @@ int main() {
       break;
     }
 
+    // Nums used for looking for redirects
+    int num_tokens = tokenize(&input, &tokenized_input);
+    int start_index = 0;
+
     // Check for any redirections in the command
     // cmd2 is only used if there's a pipe
     process cmd1 = {tokenized_input, NULL, NULL, NULL, false, false};
     process cmd2 = {NULL, NULL, NULL, NULL, false, false};
-
-    // Nums used for looking for redirects
-    int num_tokens = tokenize(&input, &tokenized_input);
-    int start_index = 0;
 
     // Flag used for if errors are found
     bool redirect_found = false;
@@ -87,6 +87,22 @@ int main() {
     setup_bools bools = {&found_error, &redirect_found};
 
     bool pipe_found = setup_tok_cmd(&tokenized_input, &cmd1, &nums, &bools);
+
+    // If the user inputted a pipe, then parse for the second process
+    /*if (pipe_found) {
+      redirect_found = false;
+
+      // Run the setup for the second process
+      setup_tok_cmd(&tokenized_input, &cmd2, &nums, &bools);
+
+      printf("%s\n", cmd2.argv[0]);
+
+       cpid = fork();
+      if (cpid = 0) {
+        execvp(cmd2.argv[0], cmd2.argv);
+        break;
+      }
+    }*/
 
     // If I found an error then there's no point in trying
     // the command
@@ -120,7 +136,7 @@ int main() {
         dup2(ofd, STDERR_FILENO);
       }
 
-      execvp(tokenized_input[0], tokenized_input);
+      execvp(cmd1.argv[0], cmd1.argv);
       break;
     } else {
       // Parent code
