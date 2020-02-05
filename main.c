@@ -258,7 +258,11 @@ int create_child_proc(process *cmd, int pipefd[]) {
       dup2(ofd, STDERR_FILENO);
     }
 
-    execvp(cmd->argv[0], cmd->argv);
+    // validate is used to make sure that the command worked
+    int validate = execvp(cmd->argv[0], cmd->argv);
+    if (validate == -1) {
+      exit(-1);
+    }
   }
 
   return cpid;
