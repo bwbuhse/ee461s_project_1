@@ -44,18 +44,9 @@ typedef struct setup_nums {
   int *start_index;
 } setup_nums;
 
-// Used to tokenize the user's input
-// Returns the total number of tokens
 int tokenize(char **input, char **tokenized_input_ptr[]);
-
-// Used to set up a tokenized_cmd
-// nums {&num_tokens, &start_index}
-// bools {&error_found, &redirect_found}
 bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
                    setup_bools *bools);
-
-// Used to call fork and create child processes
-// Returns the child's pid ??
 int create_child_proc(process *cmd, int pipefd[]);
 
 int main() {
@@ -137,6 +128,8 @@ int main() {
   return 0;
 }
 
+// Used to tokenize the user's input
+// Returns the total number of tokens
 int tokenize(char **input, char **tokenized_input_ptr[]) {
   // I used 70 because 3000/20~=70 :)
   char **tokenized_input = (char **)malloc(sizeof(char *) * 70);
@@ -157,6 +150,9 @@ int tokenize(char **input, char **tokenized_input_ptr[]) {
   return num_tokens;
 }
 
+// Used to set up a tokenized_cmd
+// nums {&num_tokens, &start_index}
+// bools {&error_found, &redirect_found}
 bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
                    setup_bools *bools) {
 
@@ -222,6 +218,8 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
   return pipe_found;
 }
 
+// Used to call fork and create child processes
+// Returns the child's pid ??
 int create_child_proc(process *cmd, int pipefd[]) {
   // Fork
   int cpid = fork();
