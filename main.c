@@ -13,8 +13,6 @@
 // TODO: Add pipes              [x]
 // TODO: Add signal handling    [ ]
 // TODO: Create bools_t & nums_t[x]
-// TODO: Kill first cmd in pipe
-//      if second gets killed   [ ]
 // TODO: Bug(?) can't ^D if I
 //      run 'cat | cat'         [ ]
 
@@ -41,9 +39,11 @@ typedef struct process {
 
 // A struct used to keep a list of active jobs
 typedef struct job_t {
-  pgid_t jobid;
+  int jobid;
+  pgid_t pgid;
   char *jobstring;
   status_t status;
+  struct job_t *next;
 } job_t;
 
 // A struct used for the setup_tok_cmd function
@@ -61,19 +61,29 @@ typedef struct setup_nums {
 int tokenize(char **input, char **tokenized_input_ptr[]);
 bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
                    setup_bools *bools);
-int create_child_proc(process *cmd, int pipefd[]);
+pgid_t create_child_proc(process *cmd, int pipefd[], int pgid_t);
+
+bool add_job(job_t **root, job_t *new_job);
+job_t *remove_job(int jobid, job_t *previous, job_t *current);
 
 int main() {
+  // Some important variables
   pid_t cpid1, cpid2;
   int status;
   int pipefd[2];
+  job_t *root = NULL;
+  int next_id = 0;
 
   // Main command loop
   while (true) {
     // Read the input into the string and then tokenize it
-    char *input = readline(PROMPT);
-    char *jobstring = strdup(input);
+    char *input = readline(PROMPT), *jobstring;
     char **tokenized_input;
+
+    // Need this later but we have to dup because strtok garbifies its input
+    if (input != NULL) {
+      jobstring = strdup(input);
+    }
 
     // Exit the shell if it's passed the EOF character
     if (input == NULL) {
@@ -96,6 +106,7 @@ int main() {
 
     setup_nums nums = {&num_tokens, &start_index};
     setup_bools bools = {&found_error, &redirect_found};
+    //      if second gets killed   [ ]
 
     bool pipe_found = setup_tok_cmd(&tokenized_input, &cmd1, &nums, &bools);
 
@@ -122,15 +133,17 @@ int main() {
     }
 
     // Create the child processes
-    int cpid1 = create_child_proc(&cmd1, pipefd), cpid2;
+    pgid_t cpid1 = create_child_proc(&cmd1, pipefd, -1), cpid2;
+    setpgid(cpid1, 0);
     if (pipe_found) {
-      cpid2 = create_child_proc(&cmd2, pipefd);
-      setpgid(cpid2, cpid1);
+      cpid2 = create_child_proc(&cmd2, pipefd, cpid1);
     }
 
     // Set up the job struct for this input
     // TODO: Make this status accurate when BG jobs are added
-    job_t job = {cpid1, jobstring, RUNNING};
+    job_t job = {next_id++, cpid1, jobstring, RUNNING};
+
+    add_job(&root, &job);
 
     // Parent code
     free(tokenized_input);
@@ -140,10 +153,7 @@ int main() {
 
     // Wait for the child processes to finish
     // TODO: Update this whenever I add background processes
-    waitpid(cpid1, &status, 0);
-    if (pipe_found) {
-      waitpid(cpid2, &status, 0);
-    }
+    waitpid(-cpid1, &status, 0);
   }
 
   return 0;
@@ -241,11 +251,16 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
 
 // Used to call fork and create child processes
 // Returns the child's pid ??
-int create_child_proc(process *cmd, int pipefd[]) {
+pgid_t create_child_proc(process *cmd, int pipefd[], pgid_t pgid) {
   // Fork
-  int cpid = fork();
+  pid_t cpid = fork();
   if (cpid == 0) {
     // child code
+    // Set pgid
+    if (pgid != -1) {
+      int id = setpgid(0, pgid);
+    }
+
     // Do any pipe redirects
     if (cmd->isPipeArg1) {
       close(pipefd[0]);               // Close the unused read end
@@ -290,4 +305,26 @@ int create_child_proc(process *cmd, int pipefd[]) {
   }
 
   return cpid;
+}
+
+// These two functions are used for adding/removed job_nodes to the job_node
+// linked list
+// returns true if succesfully added to the list, else false
+bool add_job(job_t **root_ptr, job_t *new_node) {
+  if (*root_ptr == NULL) {
+    *root_ptr = new_node;
+    return true;
+  } else if ((*root_ptr)->next == NULL) {
+    (*root_ptr)->next = new_node;
+    return true;
+  } else {
+    return add_job(&((*root_ptr)->next), new_node);
+  }
+
+  return false;
+}
+
+// returns a pointer to job_node with jobid = jobid param, else NULL
+job_t *remove_job(int jobid, job_t *previous, job_t *current) {
+  return (job_t *)NULL;
 }
