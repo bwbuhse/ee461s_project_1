@@ -10,7 +10,7 @@
 
 // TODO: Add process groups     [ ]
 // TODO: Add file redirects     [x]
-// TODO: Add pipes              [ ]
+// TODO: Add pipes              [x]
 // TODO: Add signal handling    [ ]
 // TODO: Create bools_t & nums_t[x]
 
