@@ -54,8 +54,12 @@ int tokenize(char **input, char **tokenized_input_ptr[]);
 bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
                    setup_bools *bools);
 
+// Used to call fork and create child processes
+// Returns the child's pid ??
+int create_child_proc(process *cmd);
+
 int main() {
-  pid_t cpid;
+  pid_t cpid1, cpid2;
   int status;
 
   // Main command loop
@@ -89,20 +93,15 @@ int main() {
     bool pipe_found = setup_tok_cmd(&tokenized_input, &cmd1, &nums, &bools);
 
     // If the user inputted a pipe, then parse for the second process
-    /*if (pipe_found) {
+    if (pipe_found) {
       redirect_found = false;
+
+      // Since this is the second command we have to change some things....
+      cmd2.argv = tokenized_input + start_index;
 
       // Run the setup for the second process
       setup_tok_cmd(&tokenized_input, &cmd2, &nums, &bools);
-
-      printf("%s\n", cmd2.argv[0]);
-
-       cpid = fork();
-      if (cpid = 0) {
-        execvp(cmd2.argv[0], cmd2.argv);
-        break;
-      }
-    }*/
+    }
 
     // If I found an error then there's no point in trying
     // the command
@@ -111,8 +110,8 @@ int main() {
     }
 
     // Fork
-    cpid = fork();
-    if (cpid == 0) {
+    cpid1 = fork();
+    if (cpid1 == 0) {
       // child code
       // Do any redirects
       if (cmd1.output_file) {
@@ -146,7 +145,7 @@ int main() {
 
     // Wait for the child processes to finish
     // TODO: Update this whenever I add background processes
-    waitpid(cpid, &status, 0);
+    waitpid(cpid1, &status, 0);
   }
 
   return 0;
@@ -183,6 +182,9 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
     if (!strcmp((*tokenized_input_ptr)[i], PIPE)) {
       if (i + 1 < *(nums->num_tokens)) {
         pipe_found = true;
+        *(nums->start_index) = i + 1;
+        (*tokenized_input_ptr)[i] = NULL;
+        break;
       } else {
         *(bools->found_error) = true;
         break;
@@ -229,7 +231,9 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
   }
 
   // Used to return the value, needed for when a pipe is found
-  *(nums->start_index) = i;
+  // *(nums->start_index) = i;
 
   return pipe_found;
 }
+
+int create_child_proc(process *cmd) {}
