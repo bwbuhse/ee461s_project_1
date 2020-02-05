@@ -56,7 +56,7 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
 
 // Used to call fork and create child processes
 // Returns the child's pid ??
-int create_child_proc(process *cmd);
+int create_child_proc(process *cmd, int pipefd[]);
 
 int main() {
   pid_t cpid1, cpid2;
@@ -98,7 +98,9 @@ int main() {
       redirect_found = false;
 
       // Since this is the second command we have to change some things....
+      cmd1.isPipeArg1 = true;
       cmd2.argv = tokenized_input + start_index;
+      cmd2.isPipeArg2 = true;
 
       // Run the setup for the second process
       setup_tok_cmd(&tokenized_input, &cmd2, &nums, &bools);
@@ -113,15 +115,23 @@ int main() {
       continue;
     }
 
-    int cpid1 = create_child_proc(&cmd1);
+    int cpid1 = create_child_proc(&cmd1, pipefd), cpid2;
+    if (pipe_found) {
+      cpid2 = create_child_proc(&cmd2, pipefd);
+    }
 
     // Parent code
     free(tokenized_input);
     free(input);
+    close(pipefd[0]);
+    close(pipefd[1]);
 
     // Wait for the child processes to finish
     // TODO: Update this whenever I add background processes
     waitpid(cpid1, &status, 0);
+    if (pipe_found) {
+      waitpid(cpid2, &status, 0);
+    }
   }
 
   return 0;
@@ -212,12 +222,21 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
   return pipe_found;
 }
 
-int create_child_proc(process *cmd) {
+int create_child_proc(process *cmd, int pipefd[]) {
   // Fork
   int cpid = fork();
   if (cpid == 0) {
     // child code
-    // Do any redirects
+    // Do any pipe redirects
+    if (cmd->isPipeArg1) {
+      close(pipefd[0]);               // Close the unused read end
+      dup2(pipefd[1], STDOUT_FILENO); // Redirect output to the pipe
+    } else if (cmd->isPipeArg2) {
+      close(pipefd[1]);              // Close the unused write end
+      dup2(pipefd[0], STDIN_FILENO); // Redirect input to the pipe
+    }
+
+    // Do any file redirects
     if (cmd->output_file) {
       int ofd = open(cmd->output_file, O_CREAT | O_WRONLY | O_TRUNC,
                      S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
