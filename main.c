@@ -61,6 +61,7 @@ int create_child_proc(process *cmd);
 int main() {
   pid_t cpid1, cpid2;
   int status;
+  int pipefd[2];
 
   // Main command loop
   while (true) {
@@ -101,6 +102,9 @@ int main() {
 
       // Run the setup for the second process
       setup_tok_cmd(&tokenized_input, &cmd2, &nums, &bools);
+
+      // Set up the pipe for use later
+      pipe(pipefd);
     }
 
     // If I found an error then there's no point in trying
@@ -109,39 +113,11 @@ int main() {
       continue;
     }
 
-    // Fork
-    cpid1 = fork();
-    if (cpid1 == 0) {
-      // child code
-      // Do any redirects
-      if (cmd1.output_file) {
-        int ofd = open(cmd1.output_file, O_CREAT | O_WRONLY | O_TRUNC,
-                       S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
-        dup2(ofd, STDOUT_FILENO);
-      }
-      if (cmd1.input_file) {
-        int ifd = open(cmd1.input_file, O_RDONLY);
+    int cpid1 = create_child_proc(&cmd1);
 
-        // If the file doesn't exist then just skip this
-        // command and go to the top
-        if (ifd == -1) {
-          continue;
-        }
-        dup2(ifd, STDIN_FILENO);
-      }
-      if (cmd1.error_file) {
-        int ofd = open(cmd1.error_file, O_CREAT | O_WRONLY | O_TRUNC,
-                       S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
-        dup2(ofd, STDERR_FILENO);
-      }
-
-      execvp(cmd1.argv[0], cmd1.argv);
-      break;
-    } else {
-      // Parent code
-      free(tokenized_input);
-      free(input);
-    }
+    // Parent code
+    free(tokenized_input);
+    free(input);
 
     // Wait for the child processes to finish
     // TODO: Update this whenever I add background processes
@@ -236,4 +212,35 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
   return pipe_found;
 }
 
-int create_child_proc(process *cmd) {}
+int create_child_proc(process *cmd) {
+  // Fork
+  int cpid = fork();
+  if (cpid == 0) {
+    // child code
+    // Do any redirects
+    if (cmd->output_file) {
+      int ofd = open(cmd->output_file, O_CREAT | O_WRONLY | O_TRUNC,
+                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
+      dup2(ofd, STDOUT_FILENO);
+    }
+    if (cmd->input_file) {
+      int ifd = open(cmd->input_file, O_RDONLY);
+
+      // If the file doesn't exist then just skip this
+      // command and go to the top
+      if (ifd == -1) {
+        return -1;
+      }
+      dup2(ifd, STDIN_FILENO);
+    }
+    if (cmd->error_file) {
+      int ofd = open(cmd->error_file, O_CREAT | O_WRONLY | O_TRUNC,
+                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
+      dup2(ofd, STDERR_FILENO);
+    }
+
+    execvp(cmd->argv[0], cmd->argv);
+  }
+
+  return cpid;
+}
