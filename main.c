@@ -13,6 +13,10 @@
 // TODO: Add pipes              [x]
 // TODO: Add signal handling    [ ]
 // TODO: Create bools_t & nums_t[x]
+// TODO: Kill first cmd in pipe
+//      if second gets killed   [ ]
+// TODO: Bug(?) can't ^D if I
+//      run 'cat | cat'         [ ]
 
 // Some macros used for keeping code nice
 #define PROMPT "# "
@@ -20,6 +24,10 @@
 #define INPUT_REDIR "<"
 #define ERR_REDIR "2>"
 #define PIPE "|"
+
+// Used by the job struct
+typedef enum status_t { RUNNING, STOPPED, DONE } status_t;
+typedef int pgid_t;
 
 // A struct used for holding parsed versions of commands
 typedef struct process {
@@ -29,8 +37,14 @@ typedef struct process {
   char *error_file;
   bool isPipeArg1; // true when the command is on the left side of a pipe
   bool isPipeArg2; // true when the command is on the right side of a pipe
-
 } process;
+
+// A struct used to keep a list of active jobs
+typedef struct job_t {
+  pgid_t jobid;
+  char *jobstring;
+  status_t status;
+} job_t;
 
 // A struct used for the setup_tok_cmd function
 typedef struct setup_bools {
@@ -58,6 +72,7 @@ int main() {
   while (true) {
     // Read the input into the string and then tokenize it
     char *input = readline(PROMPT);
+    char *jobstring = strdup(input);
     char **tokenized_input;
 
     // Exit the shell if it's passed the EOF character
@@ -106,10 +121,16 @@ int main() {
       continue;
     }
 
+    // Create the child processes
     int cpid1 = create_child_proc(&cmd1, pipefd), cpid2;
     if (pipe_found) {
       cpid2 = create_child_proc(&cmd2, pipefd);
+      setpgid(cpid2, cpid1);
     }
+
+    // Set up the job struct for this input
+    // TODO: Make this status accurate when BG jobs are added
+    job_t job = {cpid1, jobstring, RUNNING};
 
     // Parent code
     free(tokenized_input);
@@ -178,7 +199,7 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
       *(bools->redirect_found) = true;
 
       if (i + 1 < *(nums->num_tokens)) {
-        (*cmd).output_file = (*tokenized_input_ptr)[i + 1];
+        cmd->output_file = (*tokenized_input_ptr)[i + 1];
       } else {
         // The input was invalid if i >= num_tokens here (ended cmd w >)
         *(bools->found_error) = true;
@@ -188,7 +209,7 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
       *(bools->redirect_found) = true;
 
       if (i + 1 < *(nums->num_tokens)) {
-        (*cmd).input_file = (*tokenized_input_ptr)[i + 1];
+        cmd->input_file = (*tokenized_input_ptr)[i + 1];
       } else {
         // The input was invalid if i >= num_tokens here (ended cmd w >)
         *(bools->found_error) = true;
@@ -198,7 +219,7 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
       *(bools->redirect_found) = true;
 
       if (i + 1 < *(nums->num_tokens)) {
-        (*cmd).error_file = (*tokenized_input_ptr)[i + 1];
+        cmd->error_file = (*tokenized_input_ptr)[i + 1];
       } else {
         // The input was invalid if i >= num_tokens here (ended cmd w >)
         *(bools->found_error) = true;
@@ -255,6 +276,11 @@ int create_child_proc(process *cmd, int pipefd[]) {
                      S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
       dup2(ofd, STDERR_FILENO);
     }
+
+    // Create a new process group
+    // If this is the right child of a pipe, it will get moved to the left
+    // child's group soon
+    setpgid(0, 0);
 
     // validate is used to make sure that the command worked
     int validate = execvp(cmd->argv[0], cmd->argv);
