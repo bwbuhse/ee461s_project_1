@@ -148,7 +148,7 @@ int main() {
 
     // Set up the job struct for this input
     // TODO: Make this status accurate when BG jobs are added
-    job_t job = {next_id++, cpid1, jobstring, RUNNING};
+    job_t job = {next_id++, cpid1, jobstring, RUNNING, NULL};
 
     // I only want to add jobs to the linked list if they're going to be in the
     // background, otherwise I know where they are
@@ -344,7 +344,14 @@ job_t *remove_job(int jobid, job_t **current, job_t *previous) {
     if (previous != NULL) {
       previous->next = (*current)->next;
     } else {
-      *current = NULL;
+      if ((*current)->next != NULL) {
+        *current = (*current) -> next;
+      }
+      else {
+        // i think this will set root to null if it doesn't have a next?
+        // Honestly not sure
+        *current = NULL;
+      }
     }
     return *current;
   } else {
