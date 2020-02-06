@@ -8,10 +8,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-// TODO: Add process groups     [ ]
+// TODO: Add process groups     [x]
 // TODO: Add file redirects     [x]
 // TODO: Add pipes              [x]
 // TODO: Add signal handling    [ ]
+// TODO: Add job handling       [ ]
 // TODO: Create bools_t & nums_t[x]
 // TODO: Bug(?) can't ^D if I
 //      run 'cat | cat'         [ ]
@@ -64,7 +65,7 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
 pgid_t create_child_proc(process *cmd, int pipefd[], int pgid_t);
 
 bool add_job(job_t **root, job_t *new_job);
-job_t *remove_job(int jobid, job_t *previous, job_t *current);
+job_t *remove_job(int jobid, job_t *current, job_t *previous);
 
 int main() {
   // Some important variables
@@ -94,6 +95,9 @@ int main() {
     // Nums used for looking for redirects
     int num_tokens = tokenize(&input, &tokenized_input);
     int start_index = 0;
+
+    // Check if this job is to be run in the background
+    bool isBackgroundJob = strcmp(tokenized_input[num_tokens - 1], "&");
 
     // Check for any redirections in the command
     // cmd2 is only used if there's a pipe
@@ -143,7 +147,11 @@ int main() {
     // TODO: Make this status accurate when BG jobs are added
     job_t job = {next_id++, cpid1, jobstring, RUNNING};
 
-    add_job(&root, &job);
+    // I only want to add jobs to the linked list if they're going to be in the
+    // background, otherwise I know where they are
+    if (isBackgroundJob) {
+      add_job(&root, &job);
+    }
 
     // Parent code
     free(tokenized_input);
@@ -325,6 +333,12 @@ bool add_job(job_t **root_ptr, job_t *new_node) {
 }
 
 // returns a pointer to job_node with jobid = jobid param, else NULL
-job_t *remove_job(int jobid, job_t *previous, job_t *current) {
-  return (job_t *)NULL;
+job_t *remove_job(int jobid, job_t *current, job_t *previous) {
+  if (current = NULL) {
+    return NULL;
+  } else if (current->jobid == jobid) {
+    return current;
+  } else {
+    return remove_job(jobid, current->next, current);
+  }
 }
