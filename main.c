@@ -65,7 +65,7 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
 pgid_t create_child_proc(process *cmd, int pipefd[], int pgid_t);
 
 bool add_job(job_t **root, job_t *new_job);
-job_t *remove_job(int jobid, job_t *current, job_t *previous);
+job_t *remove_job(int jobid, job_t **current, job_t *previous);
 
 int main() {
   // Some important variables
@@ -96,8 +96,11 @@ int main() {
     int num_tokens = tokenize(&input, &tokenized_input);
     int start_index = 0;
 
-    // Check if this job is to be run in the background
+    // Check for job control tokens
     bool isBackgroundJob = strcmp(tokenized_input[num_tokens - 1], "&");
+    bool isJobsCmd = strcmp(tokenized_input[0], "jobs");
+    bool isFgCmd = strcmp(tokenized_input[0], "fg");
+    bool isBgCmd = strcmp(tokenized_input[0], "bg");
 
     // Check for any redirections in the command
     // cmd2 is only used if there's a pipe
@@ -332,13 +335,19 @@ bool add_job(job_t **root_ptr, job_t *new_node) {
   return false;
 }
 
+// TODO: Make sure this isn't buggy
 // returns a pointer to job_node with jobid = jobid param, else NULL
-job_t *remove_job(int jobid, job_t *current, job_t *previous) {
-  if (current = NULL) {
+job_t *remove_job(int jobid, job_t **current, job_t *previous) {
+  if (*current == NULL) {
     return NULL;
-  } else if (current->jobid == jobid) {
-    return current;
+  } else if ((*current)->jobid == jobid) {
+    if (previous != NULL) {
+      previous->next = (*current)->next;
+    } else {
+      *current = NULL;
+    }
+    return *current;
   } else {
-    return remove_job(jobid, current->next, current);
+    return remove_job(jobid, &((*current)->next), *current);
   }
 }
