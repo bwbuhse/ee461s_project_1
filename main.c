@@ -119,6 +119,7 @@ int main() {
     bool isFgCmd = !strcmp(tokenized_input[0], "fg");
     bool isBgCmd = !strcmp(tokenized_input[0], "bg");
 
+    // Do the work for fg
     if (isFgCmd) {
       volatile job_t *cnode = root;
       int pgid;
@@ -138,6 +139,35 @@ int main() {
 
       // Blocking call to wait for the foreground job to finish
       waitpid(-pgid, &status, 0);
+      continue;
+    }
+
+    // Do the work for jobs
+    if (isJobsCmd) {
+      volatile job_t *cnode = root;
+
+      char *status_string;
+
+      switch (cnode->status) {
+      case RUNNING:
+        status_string = "RUNNING";
+        break;
+      case STOPPED:
+        status_string = "STOPPED";
+        break;
+      case DONE:
+        status_string = "DONE";
+        break;
+      }
+
+      // Go through all of the jobs
+      while (cnode != NULL) {
+
+        printf("[%d] - %s\t\t%s\n", cnode->jobid, status_string,
+               cnode->jobstring);
+
+        cnode = cnode->next;
+      }
       continue;
     }
 
