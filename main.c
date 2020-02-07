@@ -67,8 +67,11 @@ pgid_t create_child_proc(process *cmd, int pipefd[], int pgid_t);
 bool add_job(job_t *current_node, job_t *new_node);
 job_t *remove_job(int jobid, job_t *current, job_t *previous);
 
+void sighandler(int signo);
+
 // This variable needs to be global so that the signal handler can go through it
 volatile job_t *root;
+int status;
 
 int main() {
   // Some important variables
@@ -77,6 +80,9 @@ int main() {
   int pipefd[2];
   int next_id = 0;
   job_t *root = NULL;
+
+  // Set up signal handler
+  signal(SIGCHLD, sighandler);
 
   // Main command loop
   while (true) {
@@ -110,7 +116,6 @@ int main() {
     // named &
     if (isBackgroundJob) {
       tokenized_input[--num_tokens] = NULL;
-      // printf("WE GOT IN\n");
     }
 
     // Check for any redirections in the command
@@ -124,7 +129,6 @@ int main() {
 
     setup_nums nums = {&num_tokens, &start_index};
     setup_bools bools = {&found_error, &redirect_found};
-    //      if second gets killed   [ ]
 
     bool pipe_found = setup_tok_cmd(&tokenized_input, &cmd1, &nums, &bools);
 
@@ -269,9 +273,6 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
     }
   }
 
-  // Used to return the value, needed for when a pipe is found
-  // *(nums->start_index) = i;
-
   return pipe_found;
 }
 
@@ -281,6 +282,9 @@ pgid_t create_child_proc(process *cmd, int pipefd[], pgid_t pgid) {
   // Fork
   pid_t cpid = fork();
   if (cpid == 0) {
+    // We don't care about users messing up I/O
+    signal(SIGTTOU, SIG_IGN);
+
     // child code
     // Set pgid
     if (pgid != -1) {
@@ -350,7 +354,6 @@ bool add_job(job_t *current_node, job_t *new_node) {
   return false;
 }
 
-// TODO: Make sure this isn't buggy
 // returns a pointer to job_node with jobid = jobid param, else NULL
 job_t *remove_job(int jobid, job_t *current, job_t *previous) {
   if (current == NULL) {
@@ -368,5 +371,14 @@ job_t *remove_job(int jobid, job_t *current, job_t *previous) {
     return current;
   } else {
     return remove_job(jobid, current->next, current);
+  }
+}
+
+// signal handler
+void sighandler(int signo) {
+  if (signo == SIGCHLD) {
+    // Reap all the dead children
+    while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {
+    }
   }
 }
