@@ -130,6 +130,8 @@ int main() {
           kill(-(cnode->pgid), SIGCONT);
           kill(cnode->pgid, SIGCONT);
 
+          cnode->status = RUNNING;
+
           printf("%s\n", cnode->jobstring);
           break;
         } else {
@@ -138,7 +140,11 @@ int main() {
       }
 
       // Blocking call to wait for the foreground job to finish
-      waitpid(-pgid, &status, 0);
+      waitpid(-pgid, &status, WUNTRACED);
+      if (!WIFSTOPPED(status)) {
+        remove_job(cnode->jobid, (job_t *)root, NULL);
+      }
+
       continue;
     }
 
@@ -146,22 +152,22 @@ int main() {
     if (isJobsCmd) {
       volatile job_t *cnode = root;
 
-      char *status_string;
-
-      switch (cnode->status) {
-      case RUNNING:
-        status_string = "RUNNING";
-        break;
-      case STOPPED:
-        status_string = "STOPPED";
-        break;
-      case DONE:
-        status_string = "DONE";
-        break;
-      }
-
       // Go through all of the jobs
       while (cnode != NULL) {
+
+        char *status_string;
+
+        switch (cnode->status) {
+        case RUNNING:
+          status_string = "RUNNING";
+          break;
+        case STOPPED:
+          status_string = "STOPPED";
+          break;
+        case DONE:
+          status_string = "DONE";
+          break;
+        }
 
         printf("[%d] - %s\t\t%s\n", cnode->jobid, status_string,
                cnode->jobstring);
@@ -244,7 +250,9 @@ int main() {
     } else {
       // Blocking call to wait for the foreground job to finish
       waitpid(-cpid1, &status, WUNTRACED);
-      remove_job(job->jobid, (job_t *)root, NULL);
+      if (!WIFSTOPPED(status)) {
+        remove_job(job->jobid, (job_t *)root, NULL);
+      }
     }
   }
 
@@ -426,11 +434,12 @@ job_t *remove_job(int jobid, job_t *current, job_t *previous) {
     if (previous != NULL) {
       previous->next = current->next;
     } else {
-      // If we get into this branch, we know that the job we found was the root
+      // If we get into this branch, we know that the job we found was the
+      // root
       root = current->next;
     }
-    current->next = NULL; // Just so we don't accidentally use it
-    job_ids[current->jobid] = false; // Free up the job id!
+    current->next = NULL;                // Just so we don't accidentally use it
+    job_ids[current->jobid - 1] = false; // Free up the job id!
     return current;
   } else {
     return remove_job(jobid, current->next, current);
@@ -444,6 +453,8 @@ void sighandler(int signo) {
   if (signo == SIGCHLD) {
     // Reap all the dead children lmao
     while (cnode != NULL) {
+      // TODO: It doesn't know how to deal with stuff that dies in the
+      // foreground? I think
       int pgid = waitpid(-1 * (cnode->pgid), 0, WNOHANG);
 
       if (pgid == cnode->pgid) {
