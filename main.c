@@ -64,7 +64,7 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
                    setup_bools *bools);
 pgid_t create_child_proc(process *cmd, int pipefd[], int pgid_t);
 
-bool add_job(job_t *current_node, job_t *new_node);
+bool add_job(volatile job_t *current_node, job_t *new_node);
 job_t *remove_job(int jobid, job_t *current, job_t *previous);
 
 void sighandler(int signo);
@@ -79,7 +79,6 @@ int main() {
   int status;
   int pipefd[2];
   int next_id = 0;
-  job_t *root = NULL;
 
   // Set up signal handler
   signal(SIGCHLD, sighandler);
@@ -163,12 +162,18 @@ int main() {
 
     // Set up the job struct for this input
     // TODO: Make this status accurate when BG jobs are added
-    job_t job = {next_id++, cpid1, jobstring, RUNNING, NULL};
 
     // I only want to add jobs to the linked list if they're going to be in the
     // background, otherwise I know where they are
     if (isBackgroundJob) {
-      add_job(root, &job);
+      job_t *job = malloc(sizeof(job_t));
+      job->jobid = next_id++;
+      job->pgid = cpid1;
+      job->jobstring = jobstring;
+      job->status = RUNNING;
+      job->next = NULL;
+
+      add_job(root, job);
     }
 
     // Parent code
@@ -340,11 +345,11 @@ pgid_t create_child_proc(process *cmd, int pipefd[], pgid_t pgid) {
 // These two functions are used for adding/removed job_nodes to the job_node
 // linked list
 // returns true if succesfully added to the list, else false
-bool add_job(job_t *current_node, job_t *new_node) {
+bool add_job(volatile job_t *current_node, job_t *new_node) {
   if (current_node == NULL) {
     root = new_node;
     return true;
-  } else if (current_node->next = NULL) {
+  } else if (current_node->next == NULL) {
     current_node->next = new_node;
     return true;
   } else {
@@ -377,8 +382,18 @@ job_t *remove_job(int jobid, job_t *current, job_t *previous) {
 // signal handler
 void sighandler(int signo) {
   if (signo == SIGCHLD) {
-    // Reap all the dead children
-    while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {
+    volatile job_t *cnode = root;
+
+    // Reap all the dead children lmao
+    while (cnode != NULL) {
+      int status = waitpid(-1 * (cnode->pgid), 0, WNOHANG);
+
+      if (status == cnode->pgid) {
+        job_t *old = remove_job(cnode->jobid, (job_t *)root, NULL);
+        free(old);
+      }
+
+      cnode = cnode->next;
     }
   }
 }
