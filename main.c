@@ -64,16 +64,19 @@ bool setup_tok_cmd(char **tokenized_input_ptr[], process *cmd, setup_nums *nums,
                    setup_bools *bools);
 pgid_t create_child_proc(process *cmd, int pipefd[], int pgid_t);
 
-bool add_job(job_t **root, job_t *new_job);
-job_t *remove_job(int jobid, job_t **current, job_t *previous);
+bool add_job(job_t *current_node, job_t *new_node);
+job_t *remove_job(int jobid, job_t *current, job_t *previous);
+
+// This variable needs to be global so that the signal handler can go through it
+volatile job_t *root;
 
 int main() {
   // Some important variables
   pid_t cpid1, cpid2;
   int status;
   int pipefd[2];
-  job_t *root = NULL;
   int next_id = 0;
+  job_t *root = NULL;
 
   // Main command loop
   while (true) {
@@ -97,10 +100,18 @@ int main() {
     int start_index = 0;
 
     // Check for job control tokens
-    bool isBackgroundJob = strcmp(tokenized_input[num_tokens - 1], "&");
+    bool isBackgroundJob = (tokenized_input[num_tokens - 1][0] == '&');
     bool isJobsCmd = strcmp(tokenized_input[0], "jobs");
     bool isFgCmd = strcmp(tokenized_input[0], "fg");
     bool isBgCmd = strcmp(tokenized_input[0], "bg");
+
+    // If it's a background job we want to set the & to null because otherwise
+    // it'll Confused the commands i.e. cat Makefile & would try to cat a file
+    // named &
+    if (isBackgroundJob) {
+      tokenized_input[--num_tokens] = NULL;
+      // printf("WE GOT IN\n");
+    }
 
     // Check for any redirections in the command
     // cmd2 is only used if there's a pipe
@@ -153,7 +164,7 @@ int main() {
     // I only want to add jobs to the linked list if they're going to be in the
     // background, otherwise I know where they are
     if (isBackgroundJob) {
-      add_job(&root, &job);
+      add_job(root, &job);
     }
 
     // Parent code
@@ -162,9 +173,13 @@ int main() {
     close(pipefd[0]);
     close(pipefd[1]);
 
-    // Wait for the child processes to finish
-    // TODO: Update this whenever I add background processes
-    waitpid(-cpid1, &status, 0);
+    // Wait for the child processes to finish OR let them run in the background
+    if (isBackgroundJob) {
+      waitpid(-cpid1, &status, WNOHANG | WUNTRACED);
+    } else {
+      // Blocking call to wait for the foreground job to finish
+      waitpid(-cpid1, &status, 0);
+    }
   }
 
   return 0;
@@ -321,15 +336,15 @@ pgid_t create_child_proc(process *cmd, int pipefd[], pgid_t pgid) {
 // These two functions are used for adding/removed job_nodes to the job_node
 // linked list
 // returns true if succesfully added to the list, else false
-bool add_job(job_t **root_ptr, job_t *new_node) {
-  if (*root_ptr == NULL) {
-    *root_ptr = new_node;
+bool add_job(job_t *current_node, job_t *new_node) {
+  if (current_node == NULL) {
+    root = new_node;
     return true;
-  } else if ((*root_ptr)->next == NULL) {
-    (*root_ptr)->next = new_node;
+  } else if (current_node->next = NULL) {
+    current_node->next = new_node;
     return true;
   } else {
-    return add_job(&((*root_ptr)->next), new_node);
+    return add_job(current_node->next, new_node);
   }
 
   return false;
@@ -337,24 +352,21 @@ bool add_job(job_t **root_ptr, job_t *new_node) {
 
 // TODO: Make sure this isn't buggy
 // returns a pointer to job_node with jobid = jobid param, else NULL
-job_t *remove_job(int jobid, job_t **current, job_t *previous) {
-  if (*current == NULL) {
+job_t *remove_job(int jobid, job_t *current, job_t *previous) {
+  if (current == NULL) {
+    // The jobid doesn't exist
     return NULL;
-  } else if ((*current)->jobid == jobid) {
+  } else if (current->jobid == jobid) {
+    // We found the job!
     if (previous != NULL) {
-      previous->next = (*current)->next;
+      previous->next = current->next;
     } else {
-      if ((*current)->next != NULL) {
-        *current = (*current) -> next;
-      }
-      else {
-        // i think this will set root to null if it doesn't have a next?
-        // Honestly not sure
-        *current = NULL;
-      }
+      // If we get into this branch, we know that the job we found was the root
+      root = current->next;
     }
-    return *current;
+    current->next = NULL; // Just so we don't accidentally use it
+    return current;
   } else {
-    return remove_job(jobid, &((*current)->next), *current);
+    return remove_job(jobid, current->next, current);
   }
 }
