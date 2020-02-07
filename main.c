@@ -83,14 +83,14 @@ int main() {
   int status;
   int pipefd[2];
 
-  // Set up signal handler
+  // Set up signal handler(s)?
   signal(SIGCHLD, sighandler);
   signal(SIGTSTP, sighandler);
   signal(SIGINT, sighandler);
 
   // Main command loop
   while (true) {
-    // Set up signal handler
+    // Set up signal handler(S)
     signal(SIGCHLD, sighandler);
     signal(SIGTSTP, sighandler);
 
@@ -214,6 +214,7 @@ int main() {
     } else {
       // Blocking call to wait for the foreground job to finish
       waitpid(-cpid1, &status, WUNTRACED);
+      remove_job(job->jobid, (job_t *)root, NULL);
     }
   }
 
@@ -400,7 +401,6 @@ job_t *remove_job(int jobid, job_t *current, job_t *previous) {
     }
     current->next = NULL; // Just so we don't accidentally use it
     job_ids[current->jobid] = false; // Free up the job id!
-    printf("[%d] - Done\t\t%s\n", current->jobid, current->jobstring);
     return current;
   } else {
     return remove_job(jobid, current->next, current);
@@ -418,6 +418,7 @@ void sighandler(int signo) {
 
       if (pgid == cnode->pgid) {
         job_t *old = remove_job(cnode->jobid, (job_t *)root, NULL);
+        printf("[%d] - Done\t\t%s\n", cnode->jobid, cnode->jobstring);
         free(old);
       }
 
@@ -428,6 +429,7 @@ void sighandler(int signo) {
     while (cnode != NULL) {
       if (cnode->next == NULL) {
         kill(-(cnode->pgid), SIGTSTP);
+        cnode->status = STOPPED;
         waitpid(-1 * (cnode->pgid), 0, WNOHANG | WUNTRACED);
         break;
       } else {
@@ -460,5 +462,5 @@ int find_next_jobid() {
     }
   }
 
-  return id;
+  return id + 1;
 }
