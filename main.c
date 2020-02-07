@@ -24,6 +24,8 @@
 #define ERR_REDIR "2>"
 #define PIPE "|"
 
+#define NUM_JOBIDS 20
+
 // Used by the job struct
 typedef enum status_t { RUNNING, STOPPED, DONE } status_t;
 typedef int pgid_t;
@@ -69,22 +71,29 @@ job_t *remove_job(int jobid, job_t *current, job_t *previous);
 
 void sighandler(int signo);
 
+int find_next_jobid();
+
 // This variable needs to be global so that the signal handler can go through it
 volatile job_t *root;
-int status;
+bool job_ids[NUM_JOBIDS];
 
 int main() {
   // Some important variables
   pid_t cpid1, cpid2;
   int status;
   int pipefd[2];
-  int next_id = 0;
 
   // Set up signal handler
   signal(SIGCHLD, sighandler);
+  signal(SIGTSTP, sighandler);
+  signal(SIGINT, sighandler);
 
   // Main command loop
   while (true) {
+    // Set up signal handler
+    signal(SIGCHLD, sighandler);
+    signal(SIGTSTP, sighandler);
+
     // Read the input into the string and then tokenize it
     char *input = readline(PROMPT), *jobstring;
     char **tokenized_input;
@@ -106,9 +115,31 @@ int main() {
 
     // Check for job control tokens
     bool isBackgroundJob = (tokenized_input[num_tokens - 1][0] == '&');
-    bool isJobsCmd = strcmp(tokenized_input[0], "jobs");
-    bool isFgCmd = strcmp(tokenized_input[0], "fg");
-    bool isBgCmd = strcmp(tokenized_input[0], "bg");
+    bool isJobsCmd = !strcmp(tokenized_input[0], "jobs");
+    bool isFgCmd = !strcmp(tokenized_input[0], "fg");
+    bool isBgCmd = !strcmp(tokenized_input[0], "bg");
+
+    if (isFgCmd) {
+      volatile job_t *cnode = root;
+      int pgid;
+
+      while (cnode != NULL) {
+        if (cnode->next == NULL) {
+          pgid = cnode->pgid;
+          kill(-(cnode->pgid), SIGCONT);
+          kill(cnode->pgid, SIGCONT);
+
+          printf("%s\n", cnode->jobstring);
+          break;
+        } else {
+          cnode = cnode->next;
+        }
+      }
+
+      // Blocking call to wait for the foreground job to finish
+      waitpid(-pgid, &status, 0);
+      continue;
+    }
 
     // If it's a background job we want to set the & to null because otherwise
     // it'll Confused the commands i.e. cat Makefile & would try to cat a file
@@ -162,19 +193,14 @@ int main() {
 
     // Set up the job struct for this input
     // TODO: Make this status accurate when BG jobs are added
+    job_t *job = malloc(sizeof(job_t));
+    job->jobid = find_next_jobid();
+    job->pgid = cpid1;
+    job->jobstring = jobstring;
+    job->status = RUNNING;
+    job->next = NULL;
 
-    // I only want to add jobs to the linked list if they're going to be in the
-    // background, otherwise I know where they are
-    if (isBackgroundJob) {
-      job_t *job = malloc(sizeof(job_t));
-      job->jobid = next_id++;
-      job->pgid = cpid1;
-      job->jobstring = jobstring;
-      job->status = RUNNING;
-      job->next = NULL;
-
-      add_job(root, job);
-    }
+    add_job(root, job);
 
     // Parent code
     free(tokenized_input);
@@ -187,12 +213,12 @@ int main() {
       waitpid(-cpid1, &status, WNOHANG | WUNTRACED);
     } else {
       // Blocking call to wait for the foreground job to finish
-      waitpid(-cpid1, &status, 0);
+      waitpid(-cpid1, &status, WUNTRACED);
     }
   }
 
   return 0;
-}
+} // bottom of main
 
 // Used to tokenize the user's input
 // Returns the total number of tokens
@@ -373,6 +399,8 @@ job_t *remove_job(int jobid, job_t *current, job_t *previous) {
       root = current->next;
     }
     current->next = NULL; // Just so we don't accidentally use it
+    job_ids[current->jobid] = false; // Free up the job id!
+    printf("[%d] - Done\t\t%s\n", current->jobid, current->jobstring);
     return current;
   } else {
     return remove_job(jobid, current->next, current);
@@ -381,19 +409,56 @@ job_t *remove_job(int jobid, job_t *current, job_t *previous) {
 
 // signal handler
 void sighandler(int signo) {
-  if (signo == SIGCHLD) {
-    volatile job_t *cnode = root;
+  volatile job_t *cnode = root;
 
+  if (signo == SIGCHLD) {
     // Reap all the dead children lmao
     while (cnode != NULL) {
-      int status = waitpid(-1 * (cnode->pgid), 0, WNOHANG);
+      int pgid = waitpid(-1 * (cnode->pgid), 0, WNOHANG);
 
-      if (status == cnode->pgid) {
+      if (pgid == cnode->pgid) {
         job_t *old = remove_job(cnode->jobid, (job_t *)root, NULL);
         free(old);
       }
 
       cnode = cnode->next;
     }
+  } else if (signo == SIGTSTP) {
+    // Look for the fg job to send to background
+    while (cnode != NULL) {
+      if (cnode->next == NULL) {
+        kill(-(cnode->pgid), SIGTSTP);
+        waitpid(-1 * (cnode->pgid), 0, WNOHANG | WUNTRACED);
+        break;
+      } else {
+        cnode = cnode->next;
+      }
+    }
+  } else if (signo == SIGINT) {
+    // Look for the fg job to send SIGINT
+    while (cnode != NULL) {
+      if (cnode->next == NULL) {
+        kill(-(cnode->pgid), SIGTSTP);
+        break;
+      } else {
+        cnode = cnode->next;
+      }
+    }
+    exit(0);
   }
+}
+
+// Returns the next free job id
+int find_next_jobid() {
+  int id = -1;
+
+  for (int i = 0; i < NUM_JOBIDS; i++) {
+    if (!(job_ids[i])) {
+      job_ids[i] = true;
+      id = i;
+      break;
+    }
+  }
+
+  return id;
 }
