@@ -148,6 +148,30 @@ int main() {
       continue;
     }
 
+    // Do the work for bg
+    if (isBgCmd) {
+      volatile job_t *cnode = root;
+      int pgid;
+
+      while (cnode != NULL) {
+        if (cnode->next == NULL) {
+          pgid = cnode->pgid;
+          kill(-(cnode->pgid), SIGCONT);
+          kill(cnode->pgid, SIGCONT);
+
+          cnode->status = RUNNING;
+
+          printf("%s\n", cnode->jobstring);
+          break;
+        } else {
+          cnode = cnode->next;
+        }
+      }
+
+      waitpid(-cpid1, &status, WNOHANG | WUNTRACED);
+      continue;
+    }
+
     // Do the work for jobs
     if (isJobsCmd) {
       volatile job_t *cnode = root;
