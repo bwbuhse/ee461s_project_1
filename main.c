@@ -438,13 +438,13 @@ void sighandler(int signo) {
     // Look for the fg job to send SIGINT
     while (cnode != NULL) {
       if (cnode->next == NULL) {
-        kill(-(cnode->pgid), SIGTSTP);
+        kill(-(cnode->pgid), SIGINT);
+        waitpid(-1 * (cnode->pgid), 0, WNOHANG | WUNTRACED);
         break;
       } else {
         cnode = cnode->next;
       }
     }
-    exit(0);
   }
 }
 
