@@ -1,8 +1,8 @@
-yash: main.o
-	gcc -g main.o -lreadline -o yash
+yash: yash.o
+	gcc -g yash.o -L/usr/include/readline -lreadline -o yash
 
-main.o: main.c
-	gcc -g -c main.c
+yash.o: yash.c
+	gcc -g -c yash.c
 
 clean:
 	rm *.o yash

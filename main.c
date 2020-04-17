@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <stdio.h>
 #include <readline/readline.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -7,15 +8,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
-// TODO: Add process groups     [x]
-// TODO: Add file redirects     [x]
-// TODO: Add pipes              [x]
-// TODO: Add signal handling    [ ]
-// TODO: Add job handling       [ ]
-// TODO: Create bools_t & nums_t[x]
-// TODO: Bug(?) can't ^D if I
-//      run 'cat | cat'         [ ]
 
 // Some macros used for keeping code nice
 #define PROMPT "# "
